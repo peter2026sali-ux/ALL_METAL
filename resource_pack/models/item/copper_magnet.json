@@ -1,0 +1,7 @@
+{
+  "texture": "textures/items/copper_magnet",
+  "display": {
+    "thirdperson_righthand": { "rotation": [0, 0, 0], "translation": [0, 0, 0], "scale": [1,1,1] }
+  },
+  "render_controllers": ["controller.render.all_metal.item"]
+}

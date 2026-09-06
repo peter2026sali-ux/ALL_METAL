@@ -1,0 +1,16 @@
+{
+  "format_version": "1.16.0",
+  "minecraft:block": {
+    "description": {
+      "identifier": "all_metal:copper_furnace",
+      "is_experimental": false
+    },
+    "components": {
+      "minecraft:loot": "loot_tables/blocks/copper_furnace_loot",
+      "minecraft:container": {
+        "size": 3
+      },
+      "minecraft:block_light_emission": 0.8
+    }
+  }
+}

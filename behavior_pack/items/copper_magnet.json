@@ -1,0 +1,16 @@
+{
+  "format_version": "1.16.0",
+  "minecraft:item": {
+    "description": {
+      "identifier": "all_metal:copper_magnet",
+      "category": "Tools",
+      "is_experimental": false,
+      "register_to_creative_menu": true
+    },
+    "components": {
+      "minecraft:icon": "textures/items/copper_magnet",
+      "minecraft:max_stack_size": 1,
+      "minecraft:use_duration": 1
+    }
+  }
+}

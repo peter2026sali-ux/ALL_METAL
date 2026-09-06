@@ -1,0 +1,18 @@
+{
+  "format_version": "1.16.0",
+  "minecraft:block": {
+    "description": {
+      "identifier": "all_metal:copper_hopper",
+      "is_experimental": false
+    },
+    "components": {
+      "minecraft:loot": "loot_tables/blocks/copper_hopper_loot",
+      "minecraft:container": {
+        "size": 5
+      },
+      "minecraft:tick_world": {
+        "priority": "normal"
+      }
+    }
+  }
+}
