@@ -1,0 +1,26 @@
+{
+  "format_version": "1.12.0",
+  "minecraft:recipe_shaped": {
+    "description": {
+      "identifier": "all_metal:copper_bucket_recipe"
+    },
+    "tags": ["crafting_table"],
+    "pattern": [
+      " A ",
+      " A ",
+      " B "
+    ],
+    "key": {
+      "A": {
+        "item": "minecraft:copper_ingot"
+      },
+      "B": {
+        "item": "minecraft:stick"
+      }
+    },
+    "result": {
+      "item": "all_metal:copper_bucket",
+      "count": 1
+    }
+  }
+}

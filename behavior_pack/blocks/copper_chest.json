@@ -1,0 +1,16 @@
+{
+  "format_version": "1.16.0",
+  "minecraft:block": {
+    "description": {
+      "identifier": "all_metal:copper_chest",
+      "is_experimental": false
+    },
+    "components": {
+      "minecraft:loot": "loot_tables/blocks/copper_chest_loot",
+      "minecraft:container": {
+        "size": 27
+      },
+      "minecraft:emits_redstone": true
+    }
+  }
+}

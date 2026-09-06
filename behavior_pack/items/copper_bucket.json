@@ -1,0 +1,18 @@
+{
+  "format_version": "1.16.0",
+  "minecraft:item": {
+    "description": {
+      "identifier": "all_metal:copper_bucket",
+      "category": "Equipment",
+      "is_experimental": false
+    },
+    "components": {
+      "minecraft:icon": "textures/items/copper_bucket",
+      "minecraft:max_stack_size": 1,
+      "minecraft:durability": {
+        "max_damage": 8
+      },
+      "minecraft:use_duration": 32
+    }
+  }
+}

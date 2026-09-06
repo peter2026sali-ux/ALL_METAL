@@ -1,0 +1,11 @@
+{
+  "format_version": "1.8.0",
+  "minecraft:geometry": {
+    "description": {
+      "identifier": "geometry.copper_bucket",
+      "texture_width": 64,
+      "texture_height": 64
+    },
+    "bones": []
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "format_version": 2,
+  "header": {
+    "name": "ALL METAL — Behavior Pack (Copper Sample)",
+    "description": "Behavior Pack for ALL METAL — Copper sample. Requires Experimental Gameplay for scripting features.",
+    "uuid": "a3f8b9c0-7d6b-4c5f-9d2b-111111111111",
+    "version": [1,0,0],
+    "min_engine_version": [1, 26, 0]
+  },
+  "modules": [
+    {
+      "type": "data",
+      "description": "Behavior definitions",
+      "uuid": "b2ea7d2f-3f6a-4a6c-8c9d-222222222222",
+      "version": [1,0,0]
+    },
+    {
+      "type": "scripting",
+      "description": "Entity / machine scripts (GameTest / Scripting API)",
+      "uuid": "d4c9e8f1-6b7a-4b5f-8a9c-333333333333",
+      "version": [1,0,0],
+      "entry": "scripts/main.js"
+    }
+  ]
+}

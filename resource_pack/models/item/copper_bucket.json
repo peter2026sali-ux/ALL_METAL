@@ -1,0 +1,5 @@
+{
+  "texture": "textures/items/copper_bucket",
+  "geometry": "geometry.copper_bucket",
+  "render_controllers": ["controller.render.all_metal.item"]
+}

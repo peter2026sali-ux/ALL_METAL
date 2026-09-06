@@ -1,0 +1,18 @@
+{
+  "format_version": 2,
+  "header": {
+    "name": "ALL METAL — Resource Pack (Copper Sample)",
+    "description": "Resource Pack for ALL METAL — Copper sample. Models & textures.",
+    "uuid": "c6d7e8f9-0a1b-4c3d-9e2f-444444444444",
+    "version": [1,0,0],
+    "min_engine_version": [1, 26, 0]
+  },
+  "modules": [
+    {
+      "type": "resources",
+      "description": "Models, textures",
+      "uuid": "e7f8a9b0-1c2d-4e5f-0a9b-555555555555",
+      "version": [1,0,0]
+    }
+  ]
+}
