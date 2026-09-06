@@ -1,0 +1,51 @@
+name: Build and Release ALL_METAL
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - main
+
+jobs:
+  build_and_release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node (for potential tools)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: List files (debug)
+        run: |
+          ls -la
+
+      - name: Create mcaddon zip
+        run: |
+          rm -f ALL_METAL_26.45.mcaddon
+          zip -r ALL_METAL_26.45.mcaddon behavior_pack resource_pack
+          ls -lh ALL_METAL_26.45.mcaddon
+
+      - name: Create Release (tag v26.45)
+        id: create_release
+        uses: actions/create-release@v1
+        with:
+          tag_name: v26.45
+          release_name: ALL_METAL_26.45
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload mcaddon to Release
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ALL_METAL_26.45.mcaddon
+          asset_name: ALL_METAL_26.45.mcaddon
+          asset_content_type: application/zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
