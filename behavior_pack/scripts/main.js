@@ -1,130 +1,231 @@
-// ALL METAL — Copper tier scripts
-// Implements a simple hopper-like pull/push and a magnet item that attracts nearby dropped items into adjacent containers.
-// This script uses the experimental scripting api (server.registerSystem). It is intentionally conservative: uses queries and container APIs that are commonly supported in GameTest/Experimental.
+// ALL_METAL — core scripts implementing tiered machines and utilities
+// This script uses experimental scripting APIs; behaviour degrades gracefully if APIs are limited.
 
 const system = server.registerSystem(0, 0);
 
-// Utility constants
-const HOPPER_TICK_INTERVAL = 20; // server ticks
-const MAGNET_RANGE = 6; // blocks
+const TIERS = {
+  copper: {
+    id: "all_metal:copper",
+    hopper_capacity: 5,
+    hopper_pull_interval: 40,
+    magnet_range: 6,
+    smelter_speed: 1.0,
+    fuel_efficiency: 1.0
+  },
+  iron: {
+    id: "all_metal:iron",
+    hopper_capacity: 9,
+    hopper_pull_interval: 30,
+    magnet_range: 8,
+    smelter_speed: 1.25,
+    fuel_efficiency: 0.9
+  },
+  gold: {
+    id: "all_metal:gold",
+    hopper_capacity: 7,
+    hopper_pull_interval: 20,
+    magnet_range: 10,
+    smelter_speed: 1.6,
+    fuel_efficiency: 0.85
+  },
+  diamond: {
+    id: "all_metal:diamond",
+    hopper_capacity: 18,
+    hopper_pull_interval: 12,
+    magnet_range: 14,
+    smelter_speed: 2.0,
+    fuel_efficiency: 0.7
+  },
+  netherite: {
+    id: "all_metal:netherite",
+    hopper_capacity: 27,
+    hopper_pull_interval: 6,
+    magnet_range: 20,
+    smelter_speed: 3.0,
+    fuel_efficiency: 0.5
+  }
+};
+
+// internal polling
+let tickCounter = 0;
+const HOPPER_GLOBAL_TICK = 10; // base tick for checking hoppers
 
 system.initialize = function() {
-  // Register for custom tick event
-  this.listenForEvent("minecraft:script_logger_config", (e) => {});
-
-  // Schedule a repeating tick using a timer (emulated via delayed events)
-  this.tickTimer = 0;
-  this.registerEvent("all_metal:tick");
-  this.setupTick();
-
-  // Listen for player using magnet (toggle)
+  // register events we will use
   this.listenForEvent("minecraft:player_used_item", (e) => this.onPlayerUsedItem(e));
+  this.registerEvent("all_metal:tick_event");
+  this.setupTick();
+  this.log("ALL_METAL scripts initialized");
 }
 
 system.setupTick = function() {
-  // Using a simplified loop: schedule next tick via a delayed event
-  this.tickTimerId = this.registerDelayedEvent("all_metal:tick", HOPPER_TICK_INTERVAL);
+  this.registerDelayedEvent("all_metal:tick_event", 10);
 }
 
-system.onEvent = function(eventData) {
-  if (eventData && eventData.data && eventData.data.name === "all_metal:tick") {
-    this.performTickLogic();
-    // reschedule
+system.onEvent = function(e) {
+  if (e && e.data && e.data.name === "all_metal:tick_event") {
+    tickCounter++;
+    try { this.tickLogic(); } catch (err) { this.log(err); }
     this.setupTick();
   }
 }
 
-system.performTickLogic = function() {
-  // Find all copper_hopper block entities
-  const hoppers = this.getEntitiesWithComponent("minecraft:container");
-  if (!hoppers) return;
+system.tickLogic = function() {
+  // Hoppers: run less frequently based on base interval
+  if (tickCounter % (HOPPER_GLOBAL_TICK) === 0) {
+    this.processAllHoppers();
+  }
+  // Magnets: process players holding magnets
+  this.processPlayerMagnets();
+}
 
-  for (const ent of hoppers) {
-    const identifier = this.getComponent(ent, "minecraft:identifier") || {};
-    if (identifier && identifier.name && identifier.name.indexOf("all_metal:copper_hopper") !== -1) {
-      this.processHopper(ent);
+system.processAllHoppers = function() {
+  // Query for block entities with container component — this API may vary; we use getEntities to be safe.
+  let containers = [];
+  try {
+    containers = this.getEntitiesWithComponent("minecraft:container");
+  } catch (e) {
+    containers = [];
+  }
+  for (const ent of containers) {
+    // attempt to identify a hopper by its identifier or component
+    try {
+      const idComp = this.getComponent(ent, "minecraft:identifier");
+      if (idComp && idComp.name && idComp.name.includes("copper_hopper")) {
+        this.processHopperAtEntity(ent, TIERS.copper);
+      } else if (idComp && idComp.name && idComp.name.includes("iron_hopper")) {
+        this.processHopperAtEntity(ent, TIERS.iron);
+      } else if (idComp && idComp.name && idComp.name.includes("gold_hopper")) {
+        this.processHopperAtEntity(ent, TIERS.gold);
+      } else if (idComp && idComp.name && idComp.name.includes("diamond_hopper")) {
+        this.processHopperAtEntity(ent, TIERS.diamond);
+      } else if (idComp && idComp.name && idComp.name.includes("netherite_hopper")) {
+        this.processHopperAtEntity(ent, TIERS.netherite);
+      }
+    } catch (err) {
+      // ignore
     }
   }
+}
 
-  // Process magnet attraction: find all players holding a copper magnet and attract items
-  const players = this.getEntitiesFromQuery({"type": "player"}) || [];
-  for (const player of players) {
-    const held = this.getComponent(player, "minecraft:hand_container");
-    if (held && held.items) {
-      // naive check: any item with id all_metal:copper_magnet
-      for (const slot of held.items) {
-        if (slot.item && slot.item.indexOf("all_metal:copper_magnet") !== -1) {
-          this.attractItemsToPlayer(player, MAGNET_RANGE);
+system.processHopperAtEntity = function(entity, tier) {
+  // Try to read container component
+  try {
+    const cont = this.getComponent(entity, "minecraft:container");
+    if (!cont || !cont.items) return;
+    // find first non-empty slot
+    for (let i = 0; i < cont.items.length; i++) {
+      const slot = cont.items[i];
+      if (slot && slot.item) {
+        // try to push to adjacent container
+        const moved = this.transferItemFromContainer(entity, i, tier);
+        if (moved) break; // move one item per tick
+      }
+    }
+  } catch (e) {
+    // graceful degrade
+  }
+}
+
+system.transferItemFromContainer = function(srcEntity, slotIndex, tier) {
+  // Attempt to find adjacent containers via position queries
+  try {
+    const pos = this.getComponent(srcEntity, "minecraft:position");
+    if (!pos) return false;
+    // search blocks in 6 directions within 1 block
+    const offsets = [ [1,0,0], [-1,0,0], [0,1,0], [0,-1,0], [0,0,1], [0,0,-1] ];
+    for (const off of offsets) {
+      const tx = Math.floor(pos.x + off[0]);
+      const ty = Math.floor(pos.y + off[1]);
+      const tz = Math.floor(pos.z + off[2]);
+      // try to find container at that position
+      const q = { "all": [{ "component": "minecraft:container" }], "position": { "x": tx, "y": ty, "z": tz } };
+      let targets = [];
+      try { targets = this.getEntitiesFromQuery(q); } catch (e) { targets = []; }
+      for (const t of targets) {
+        // perform transfer via replaceitem/give/clear commands if available
+        // fallback: teleport item entity into the target and let the game pick it up
+        const success = this.attemptContainerInsertViaCommands(srcEntity, slotIndex, t);
+        if (success) return true;
+      }
+    }
+  } catch (e) {}
+  return false;
+}
+
+system.attemptContainerInsertViaCommands = function(srcEntity, slotIndex, targetEntity) {
+  // GameTest APIs across versions differ. We'll attempt to use `container` modify commands via executeCommand.
+  // Fallback teleport method: spawn a new item entity at target and remove one from source.
+  try {
+    // Get source container component and item info
+    const cont = this.getComponent(srcEntity, "minecraft:container");
+    if (!cont || !cont.items || !cont.items[slotIndex]) return false;
+    const item = cont.items[slotIndex];
+    // create an item entity at target position
+    const tpos = this.getComponent(targetEntity, "minecraft:position");
+    if (!tpos) return false;
+    const itemId = item.item || item.name || "minecraft:stone";
+    const cmd = `summon item ${tpos.x} ${tpos.y + 0.5} ${tpos.z} {Item:{id:${itemId},Count:1}}`;
+    // Note: Bedrock command syntax for summon item NBT differs; this may not work on every version.
+    this.executeCommand(cmd, (res) => {});
+    // TODO: decrement source slot via available commands or by setting container component if API allows
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+system.processPlayerMagnets = function() {
+  const players = this.getEntitiesFromQuery({ "type": "player" }) || [];
+  for (const p of players) {
+    try {
+      const hand = this.getComponent(p, "minecraft:hand_container");
+      if (!hand || !hand.items) continue;
+      for (const slot of hand.items) {
+        if (slot && slot.item && slot.item.indexOf("magnet") !== -1) {
+          // determine tier from item id
+          const tier = this.resolveTierFromItemId(slot.item);
+          if (tier) this.pullNearbyDroppedItemsToEntity(p, tier);
           break;
         }
       }
-    }
+    } catch (e) {}
   }
 }
 
-system.processHopper = function(hopperEntity) {
-  // Very simple logic: attempt to move the first non-empty slot to any adjacent container (naive)
-  try {
-    const container = this.getComponent(hopperEntity, "minecraft:container");
-    if (!container || !container.items) return;
-
-    // Find first item
-    for (let i = 0; i < container.items.length; i++) {
-      const slot = container.items[i];
-      if (slot && slot.item) {
-        // find adjacent container and move one item
-        const adjacent = this.findAdjacentContainer(hopperEntity);
-        if (adjacent) {
-          this.transferOneItem(container, i, adjacent);
-        }
-        break;
-      }
-    }
-  } catch (err) {
-    // fail silently
-  }
-}
-
-system.findAdjacentContainer = function(hopperEntity) {
-  // Placeholder: in real implementation we'd search block positions around hopperEntity
-  // For now return null (safe). Advanced implementation would use block position APIs.
+system.resolveTierFromItemId = function(itemId) {
+  if (!itemId) return null;
+  if (itemId.indexOf("copper") !== -1) return TIERS.copper;
+  if (itemId.indexOf("iron") !== -1) return TIERS.iron;
+  if (itemId.indexOf("gold") !== -1) return TIERS.gold;
+  if (itemId.indexOf("diamond") !== -1) return TIERS.diamond;
+  if (itemId.indexOf("netherite") !== -1) return TIERS.netherite;
   return null;
 }
 
-system.transferOneItem = function(containerComponent, slotIndex, targetEntity) {
-  // Placeholder: perform container item transfer via container API if available.
-}
-
-system.attractItemsToPlayer = function(playerEntity, range) {
-  // Query dropped items within range and move them into nearest container or player's inventory.
-  // Because GameTest API varies by version, this function is conservative: it will execute a command to teleport nearby items to player (works on many builds).
+system.pullNearbyDroppedItemsToEntity = function(entity, tier) {
   try {
-    const pos = this.getComponent(playerEntity, "minecraft:position");
+    const pos = this.getComponent(entity, "minecraft:position");
     if (!pos) return;
-    const cmd = `execute at @s run tp @e[type=item,distance=..${range}] ${pos.x} ${pos.y} ${pos.z}`;
-    this.executeCommand(cmd, (res) => {});
-  } catch (e) {
-  }
+    const range = tier.magnet_range || 6;
+    // Teleport item entities to the entity location (simplified but reliable).
+    const cmd = `execute as @e[type=item,dx=0,dy=0,dz=0] run tp @e[type=item,distance=..${range}] ${pos.x} ${pos.y} ${pos.z}`;
+    // The above command may not be precise; we fallback to a safer execute command anchored at entity
+    const safeCmd = `execute at ${entity.__identifier || "@s"} run tp @e[type=item,distance=..${range}] ${pos.x} ${pos.y} ${pos.z}`;
+    this.executeCommand(safeCmd, (res) => {});
+  } catch (e) {}
 }
 
-system.onPlayerUsedItem = function(eventData) {
-  // Here we could toggle a per-player magnet state.
+// Generic wrappers
+system.getEntitiesWithComponent = function(comp) {
+  try { return this.getEntitiesFromQuery({ "all": [{ "component": comp }] }) || []; } catch (e) { return []; }
 }
 
-// Helper wrappers for potential API differences
-system.getEntitiesWithComponent = function(component) {
-  // Attempt to query entities with component. GameTest's query API differs across versions; provide a safe fallback.
-  try {
-    return this.getEntitiesFromQuery({ "all": [{ "component": component }] }) || [];
-  } catch (e) {
-    return [];
-  }
+system.getEntitiesFromQuery = function(q) {
+  try { return this.getEntities(q) || []; } catch (e) { return []; }
 }
 
-system.getEntitiesFromQuery = function(query) {
-  try {
-    return this.getEntities(query) || [];
-  } catch (e) {
-    return [];
-  }
+// Utility logging
+system.log = function(msg) {
+  try { this.executeCommand(`tellraw @a {"rawtext":[{"text":"[ALL_METAL] ${msg}"}]}`); } catch (e) {}
 }
